@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pack Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <nav class="topbar">
+    <div class="topbar-inner">
+      <a href="/" class="wordmark">PACK&nbsp;CALCULATOR</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Order fulfilment</p>
+      <h1 class="hero-title">Pack allocation</h1>
+      <p class="hero-sub">
+        Fewest items shipped first, then fewest packs. Whole packs only.
+      </p>
+    </div>
+  </section>
+
+  <main class="container">
+    <section class="card">
+      <header class="card-head">
+        <h2>Pack sizes</h2>
+        <p class="hint">
+          One size per row. Changes persist across restarts.
+        </p>
+      </header>
+      <table class="data-table" id="sizesTable">
+        <thead>
+          <tr><th>Size</th><th aria-label="remove"></th></tr>
+        </thead>
+        <tbody id="sizesBody"></tbody>
+      </table>
+      <div class="row-actions">
+        <button id="addSizeBtn" type="button" class="btn btn-ghost">+ Add row</button>
+        <button id="saveSizesBtn" type="button" class="btn btn-primary">Save pack sizes</button>
+      </div>
+      <div id="sizesStatus" class="status" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <header class="card-head">
+        <h2>Calculate order</h2>
+        <p class="hint">Enter how many items were ordered and hit calculate.</p>
+      </header>
+      <div class="form-row">
+        <label class="field">
+          <span class="field-label">Items</span>
+          <input id="itemsInput" type="number" min="0" value="263" />
+        </label>
+        <button id="calcBtn" type="button" class="btn btn-primary">Calculate</button>
+      </div>
+
+      <table class="data-table" id="resultTable" hidden>
+        <thead>
+          <tr><th>Pack</th><th>Quantity</th></tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+        <tfoot>
+          <tr>
+            <td>Total items shipped</td>
+            <td id="totalItems"></td>
+          </tr>
+          <tr>
+            <td>Total packs</td>
+            <td id="totalPacks"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div id="calcStatus" class="status" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="sitefoot">
+    <div class="sitefoot-inner">
+      <p class="api-note">
+        <span class="api-label">API</span>
+        <code>GET /api/pack-sizes</code>
+        <code>PUT /api/pack-sizes</code>
+        <code>POST /api/calculate</code>
+      </p>
+      <p class="copy">&copy; Pack Calculator &middot; Whole packs only.</p>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Keep the build context small and deterministic.
+.git
+.github
+.vscode
+.idea
+.DS_Store
+
+# Local build artefacts and dev databases.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+bin/
+dist/
+out/
+
+# Test caches and coverage outputs.
+coverage.out
+*.test
+*.prof
+
+# Documentation / repo metadata that doesn't belong in the image.
+README.md
+task1.txt

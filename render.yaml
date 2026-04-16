@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: pack-calculator
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /healthz
+    disk:
+      name: pack-data
+      mountPath: /data
+      sizeGB: 1
