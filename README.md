@@ -96,7 +96,25 @@ docker compose down
 **Run container manually**
 
 ```bash
-docker run --rm -p 8080:8080 -v pack-data:/data pack-calculator:latest
+# -p publishes container TCP 8080 to the host (required — without it the API is not reachable from your machine).
+docker run --rm --name pack-calculator -p 8080:8080 -v pack-data:/data pack-calculator:latest
+```
+
+Verify from the **host** (not inside the image — the runtime is distroless and has no shell):
+
+```bash
+curl -s http://127.0.0.1:8080/healthz
+curl -s -X POST http://127.0.0.1:8080/api/calculate \
+  -H "Content-Type: application/json" \
+  -d '{"items":501,"sizes":[250,500,1000,2000,5000]}'
+```
+
+The server listens on **all interfaces** inside the container (`:8080` → `0.0.0.0`), which is what Docker’s port mapping expects. If `curl` fails with “connection refused”, check: (1) `-p 8080:8080` is present, (2) nothing else owns host port 8080, (3) the container logs show `listening on :8080`.
+
+**Smoke test (build + run + curl)** — optional:
+
+```bash
+make docker-smoke
 ```
 
 The runtime image is **distroless** (no shell). Health checks from *inside* the container are not used in Compose; verify from the host: `curl http://localhost:8080/healthz`.
@@ -130,7 +148,7 @@ Replaces the full list atomically. Duplicates removed; result sorted ascending. 
 ```bash
 curl -X PUT http://localhost:8080/api/pack-sizes \
      -H "Content-Type: application/json" \
-     -d '{"sizes":[23,31,53]}'
+     -d '{"sizes":[100,250,500,1000]}'
 ```
 
 ### `POST /api/calculate`
@@ -168,7 +186,7 @@ Example response:
 
 Dynamic programming over item counts `0 … items + max(pack size)`: for each total `i`, store the minimum number of packs to reach exactly `i` (unreachable → sentinel), and one “parent” pack size for backtracking. The answer is the **smallest** `i ≥ order size` that is reachable; walking parents from `i` down to `0` yields counts per size. That enforces “minimise overshoot first, then minimise pack count” for non-negative pack sizes.
 
-Implementation: [`internal/calculator/calculator.go`](internal/calculator/calculator.go). Tests include examples, edge cases, and invariants: [`internal/calculator/calculator_test.go`](internal/calculator/calculator_test.go).
+Implementation: [`internal/calculator/calculator.go`](internal/calculator/calculator.go). Tests include examples, boundary cases, and invariants: [`internal/calculator/calculator_test.go`](internal/calculator/calculator_test.go).
 
 ---
 
@@ -199,12 +217,13 @@ make test          # all packages, race detector
 make check         # go vet + same tests (quick pre-submit)
 make test-cover    # writes coverage.out + summary line
 make bench         # calculator benchmark only
+make docker-smoke  # Docker image + container + curl (requires Docker)
 go test ./... -v
 ```
 
 What is covered:
 
-- **`internal/calculator`** — task examples, validation, large `N`, duplicate sizes, invariants over many order sizes (see `TestCalculate_Invariants`).
+- **`internal/calculator`** — table-driven examples, validation, large `N`, duplicate sizes, invariants over many order sizes (see `TestCalculate_Invariants` and `TestCalculate_LargeOrder_Invariants`).
 - **`internal/packsize`** — empty table, seed only when empty, replace + dedupe/sort, validation errors, failure paths when the DB is closed.
 - **`internal/storage`** — open + migrate, migrate twice, insert/select, cancelled context during open.
 - **`internal/api`** — HTTP handlers and router: success paths, JSON errors, `4xx`/`5xx` from stubs, CORS `OPTIONS`, static UI route.

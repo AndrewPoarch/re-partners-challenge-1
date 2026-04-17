@@ -50,6 +50,8 @@ func main() {
 	handlers := &api.Handlers{Packs: packSvc}
 	router := api.NewRouter(handlers, webui.FS())
 
+	// Addr ":port" listens on all interfaces (0.0.0.0), not only loopback — required for
+	// Docker port publishing (-p 8080:8080) so curl from the host reaches the process.
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           router,

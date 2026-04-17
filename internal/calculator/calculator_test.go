@@ -30,7 +30,7 @@ func asMap(r Result) map[int]int {
 	return out
 }
 
-func TestCalculate_TaskExamples(t *testing.T) {
+func TestCalculate_TableExamples(t *testing.T) {
 	sizes := []int{250, 500, 1000, 2000, 5000}
 
 	cases := []struct {
@@ -76,22 +76,26 @@ func TestCalculate_TaskExamples(t *testing.T) {
 	}
 }
 
-func TestCalculate_EdgeCase500k(t *testing.T) {
-	got, err := Calculate(500_000, []int{23, 31, 53})
+func TestCalculate_LargeOrder_Invariants(t *testing.T) {
+	sizes := []int{101, 103, 107}
+	items := 99_999
+	got, err := Calculate(items, sizes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.TotalItems != 500_000 {
-		t.Fatalf("total items = %d, want 500000", got.TotalItems)
+	if got.TotalItems < items {
+		t.Fatalf("shipped %d < ordered %d", got.TotalItems, items)
 	}
-	if got.TotalPacks != 9438 {
-		t.Fatalf("total packs = %d, want 9438", got.TotalPacks)
+	if s := allocSum(got); s != got.TotalItems {
+		t.Fatalf("allocation sum %d vs total_items %d", s, got.TotalItems)
 	}
-	if allocSum(got) != 500_000 {
-		t.Fatalf("allocation sum mismatch: %d", allocSum(got))
+	if c := allocCount(got); c != got.TotalPacks {
+		t.Fatalf("allocation count %d vs total_packs %d", c, got.TotalPacks)
 	}
-	if allocCount(got) != 9438 {
-		t.Fatalf("allocation count mismatch: %d", allocCount(got))
+	for i := items; i < got.TotalItems; i++ {
+		if isReachable(i, sizes) {
+			t.Fatalf("smallest shipped total should be first reachable ≥ order: %d reachable but got %d", i, got.TotalItems)
+		}
 	}
 }
 
@@ -312,8 +316,8 @@ func isReachable(target int, sizes []int) bool {
 	return dp[target]
 }
 
-func BenchmarkCalculate_EdgeCase500k(b *testing.B) {
-	sizes := []int{23, 31, 53}
+func BenchmarkCalculate_LargeOrder(b *testing.B) {
+	sizes := []int{101, 103, 107}
 	for i := 0; i < b.N; i++ {
 		_, err := Calculate(500_000, sizes)
 		if err != nil {

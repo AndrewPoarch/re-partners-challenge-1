@@ -59,6 +59,18 @@ docker-run: docker-build ## Build and run the container, exposing :8080
 docker-stop: ## Stop and remove the running container
 	docker rm -f pack-calculator 2>/dev/null || true
 
+.PHONY: docker-smoke
+docker-smoke: docker-build ## Build image, run a temp container, curl /healthz + sample /api/calculate
+	docker rm -f pack-calc-smoke 2>/dev/null || true
+	docker run -d --name pack-calc-smoke -p $(PORT):8080 -v pack-calc-smoke-data:/data $(IMAGE)
+	@sleep 2
+	@curl -sf "http://127.0.0.1:$(PORT)/healthz" | grep -q '"status":"ok"' || (docker rm -f pack-calc-smoke; exit 1)
+	@curl -sf -X POST "http://127.0.0.1:$(PORT)/api/calculate" \
+		-H "Content-Type: application/json" \
+		-d '{"items":501,"sizes":[250,500,1000,2000,5000]}' | grep -q '"total_packs":2' || (docker rm -f pack-calc-smoke; exit 1)
+	docker rm -f pack-calc-smoke
+	@echo "docker-smoke: OK (healthz + calculate)"
+
 .PHONY: compose-up
 compose-up: ## docker compose up -d
 	docker compose up -d --build

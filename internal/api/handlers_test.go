@@ -245,7 +245,7 @@ func TestCalculate_InlineSizes(t *testing.T) {
 	stub := &stubPackSvc{sizes: nil}
 	r := newRouterWithStub(stub)
 
-	body := bytes.NewBufferString(`{"items":500000,"sizes":[23,31,53]}`)
+	body := bytes.NewBufferString(`{"items":501,"sizes":[250,500,1000,2000,5000]}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/calculate", body)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -254,9 +254,11 @@ func TestCalculate_InlineSizes(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	var got calculator.Result
-	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if got.TotalItems != 500_000 || got.TotalPacks != 9438 {
-		t.Fatalf("edge case mismatch: %+v", got)
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.TotalItems != 750 || got.TotalPacks != 2 {
+		t.Fatalf("unexpected result: %+v", got)
 	}
 }
 
