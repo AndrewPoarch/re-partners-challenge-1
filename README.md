@@ -230,8 +230,3 @@ What is covered:
 
 `cmd/server` has no separate test file (wiring is thin; behaviour is exercised through the packages above and by running the binary). Overall statement coverage from `go test ./... -cover` is typically **mid‑90%**; the core algorithm and API layers are fully covered.
 
----
-
-## Deployment note
-
-Example Render blueprint: [`render.yaml`](render.yaml). Persistent disk should match `DB_PATH` (image defaults to `/data/app.db`).
