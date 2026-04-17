@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/andreigliga/pack-calculator/internal/calculator"
 	"github.com/andreigliga/pack-calculator/internal/packsize"
+	"github.com/andreigliga/pack-calculator/internal/webui"
 )
 
 type stubPackSvc struct {
@@ -33,6 +36,39 @@ func (s *stubPackSvc) Replace(ctx context.Context, sizes []int) ([]int, error) {
 func newRouterWithStub(stub *stubPackSvc) http.Handler {
 	h := &Handlers{Packs: stub}
 	return NewRouter(h, nil)
+}
+
+func TestGetPackSizes_StorageError(t *testing.T) {
+	stub := &stubPackSvc{getErr: errors.New("db unavailable")}
+	r := newRouterWithStub(stub)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pack-sizes", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetPackSizes_NilSliceBecomesEmptyJSON(t *testing.T) {
+	stub := &stubPackSvc{sizes: nil}
+	r := newRouterWithStub(stub)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pack-sizes", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	var got packSizesResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got.Sizes) != 0 {
+		t.Fatalf("want empty sizes, got %#v", got.Sizes)
+	}
 }
 
 func TestGetPackSizes(t *testing.T) {
@@ -86,12 +122,96 @@ func TestPutPackSizes_ValidationError(t *testing.T) {
 	}
 }
 
+func TestPutPackSizes_ReplaceServerError(t *testing.T) {
+	stub := &stubPackSvc{replErr: errors.New("transaction failed")}
+	r := newRouterWithStub(stub)
+
+	body := bytes.NewBufferString(`{"sizes":[1,2,3]}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/pack-sizes", body)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPutPackSizes_UnknownJSONField(t *testing.T) {
+	stub := &stubPackSvc{}
+	r := newRouterWithStub(stub)
+
+	body := bytes.NewBufferString(`{"sizes":[1],"extra":true}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/pack-sizes", body)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestPutPackSizes_InvalidJSON(t *testing.T) {
 	stub := &stubPackSvc{}
 	r := newRouterWithStub(stub)
 
 	body := bytes.NewBufferString(`not json`)
 	req := httptest.NewRequest(http.MethodPut, "/api/pack-sizes", body)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCalculate_GetStoredSizesError(t *testing.T) {
+	stub := &stubPackSvc{getErr: errors.New("read failed")}
+	r := newRouterWithStub(stub)
+
+	body := bytes.NewBufferString(`{"items":10}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/calculate", body)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCalculate_InvalidInlinePackSize(t *testing.T) {
+	stub := &stubPackSvc{sizes: []int{250}}
+	r := newRouterWithStub(stub)
+
+	body := bytes.NewBufferString(`{"items":10,"sizes":[0]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/calculate", body)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCalculate_InvalidJSON(t *testing.T) {
+	stub := &stubPackSvc{}
+	r := newRouterWithStub(stub)
+
+	body := bytes.NewBufferString(`{`)
+	req := httptest.NewRequest(http.MethodPost, "/api/calculate", body)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d", rec.Code)
+	}
+}
+
+func TestCalculate_UnknownJSONField(t *testing.T) {
+	stub := &stubPackSvc{sizes: []int{10}}
+	r := newRouterWithStub(stub)
+
+	body := bytes.NewBufferString(`{"items":1,"unknown":1}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/calculate", body)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -190,6 +310,37 @@ func TestHealthz(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d", rec.Code)
+	}
+}
+
+func TestCORS_PreflightOPTIONS(t *testing.T) {
+	r := newRouterWithStub(&stubPackSvc{})
+	req := httptest.NewRequest(http.MethodOptions, "/api/calculate", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("missing CORS header")
+	}
+}
+
+func TestStaticUI_ServesIndex(t *testing.T) {
+	h := &Handlers{Packs: &stubPackSvc{}}
+	r := NewRouter(h, webui.FS())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(strings.ToLower(body), "html") {
+		t.Fatalf("expected HTML, got %q", body[:min(80, len(body))])
 	}
 }
 

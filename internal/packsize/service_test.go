@@ -82,6 +82,39 @@ func TestService_ReplaceAndGet(t *testing.T) {
 	}
 }
 
+func TestService_Get_AfterDBClosed(t *testing.T) {
+	db := newTestDB(t)
+	svc := New(db)
+	_ = db.Close()
+
+	_, err := svc.Get(context.Background())
+	if err == nil {
+		t.Fatal("expected error after DB closed")
+	}
+}
+
+func TestService_Replace_AfterDBClosed(t *testing.T) {
+	db := newTestDB(t)
+	svc := New(db)
+	_ = db.Close()
+
+	_, err := svc.Replace(context.Background(), []int{1, 2})
+	if err == nil {
+		t.Fatal("expected error after DB closed")
+	}
+}
+
+func TestService_SeedIfEmpty_AfterDBClosed(t *testing.T) {
+	db := newTestDB(t)
+	svc := New(db)
+	_ = db.Close()
+
+	err := svc.SeedIfEmpty(context.Background(), []int{1})
+	if err == nil {
+		t.Fatal("expected error after DB closed")
+	}
+}
+
 func TestService_ReplaceValidation(t *testing.T) {
 	ctx := context.Background()
 	svc := New(newTestDB(t))
