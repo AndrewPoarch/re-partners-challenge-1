@@ -82,6 +82,7 @@ func TestService_ReplaceAndGet(t *testing.T) {
 	}
 }
 
+// After Close(), calls should fail — checks error propagation, not happy-path only.
 func TestService_Get_AfterDBClosed(t *testing.T) {
 	db := newTestDB(t)
 	svc := New(db)

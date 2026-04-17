@@ -36,6 +36,11 @@ bench: ## Run benchmarks
 vet: ## Run go vet
 	go vet $(PKG)
 
+.PHONY: check
+check: ## vet + tests (handy before submit)
+	go vet $(PKG)
+	go test -race -count=1 $(PKG)
+
 .PHONY: tidy
 tidy: ## Clean up go.mod / go.sum
 	go mod tidy

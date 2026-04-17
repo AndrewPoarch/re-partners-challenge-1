@@ -195,17 +195,21 @@ Implementation: [`internal/calculator/calculator.go`](internal/calculator/calcul
 ## Testing
 
 ```bash
-make test          # race detector, all packages
-make test-cover    # coverage report
-make bench         # calculator benchmark
-go test ./... -v   # verbose
+make test          # all packages, race detector
+make check         # go vet + same tests (quick pre-submit)
+make test-cover    # writes coverage.out + summary line
+make bench         # calculator benchmark only
+go test ./... -v
 ```
 
-Coverage includes:
+What is covered:
 
-- **`internal/calculator`** — examples, validation, large order, tie-breaking, property-style checks.
-- **`internal/packsize`** — empty DB, seed idempotency, replace + validation.
-- **`internal/api`** — pack-size GET/PUT, calculate with stored vs inline sizes, errors, health.
+- **`internal/calculator`** — task examples, validation, large `N`, duplicate sizes, invariants over many order sizes (see `TestCalculate_Invariants`).
+- **`internal/packsize`** — empty table, seed only when empty, replace + dedupe/sort, validation errors, failure paths when the DB is closed.
+- **`internal/storage`** — open + migrate, migrate twice, insert/select, cancelled context during open.
+- **`internal/api`** — HTTP handlers and router: success paths, JSON errors, `4xx`/`5xx` from stubs, CORS `OPTIONS`, static UI route.
+
+`cmd/server` has no separate test file (wiring is thin; behaviour is exercised through the packages above and by running the binary). Overall statement coverage from `go test ./... -cover` is typically **mid‑90%**; the core algorithm and API layers are fully covered.
 
 ---
 
